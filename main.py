@@ -3,15 +3,23 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
 
+# according to https://blog.csdn.net/qq_36758914/article/details/104613596
+
 (train_images, train_labels), (_, _) = keras.datasets.mnist.load_data()
+
+# plt.imshow(train_images[0,:,:])
+# plt.title(str(train_labels[0]))
+# plt.show()
+
 train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
-train_images = (train_images - 127.5) / 127.5
+
+train_images = (train_images - 127.5) / 127.5  # [0,255] to [-1,1]
 
 BATCH_SIZE = 256
 BUFFER_SIZE = 60000
 
-datasets = tf.data.Dataset.from_tensor_slices(train_images)
-datasets = datasets.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
+datasets = tf.data.Dataset.from_tensor_slices(train_images)  # [n_images, x_size, y_size, 1]
+datasets = datasets.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)  # 256 images as a batch
 
 
 def generator_model():
@@ -68,6 +76,7 @@ discriminator_opt = keras.optimizers.Adam(1e-4)
 generator = generator_model()
 discriminator = discriminator_model()
 
+
 noise_dim = 100
 
 
@@ -85,6 +94,8 @@ def train_step(images):
     gradient_disc = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
     generator_opt.apply_gradients(zip(gradient_gen, generator.trainable_variables))
     discriminator_opt.apply_gradients(zip(gradient_disc, discriminator.trainable_variables))
+    generator.summary()
+    discriminator.summary()
 
 
 def generate_plot_image(gen_model, test_noise):
