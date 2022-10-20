@@ -23,7 +23,7 @@ path_to_zip = pathlib.Path(path_to_zip)
 
 PATH = path_to_zip.parent / dataset_name
 
-list(PATH.parent.iterdir())
+print(list(PATH.parent.iterdir()))
 
 sample_image = tf.io.read_file(str(PATH / 'train/1.jpg'))
 sample_image = tf.io.decode_jpeg(sample_image)
@@ -415,4 +415,4 @@ def fit(train_ds, test_ds, steps):
 # %load_ext tensorboard
 # %tensorboard --logdir {log_dir}
 
-fit(train_dataset, test_dataset, steps=40000)
+fit(train_dataset, test_dataset, steps=10)
