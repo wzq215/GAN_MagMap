@@ -7,6 +7,8 @@ import time
 import datetime
 
 from matplotlib import pyplot as plt
+# from psi_Brtp_to_rgb import *
+import numpy as np
 
 # from IPython import display
 
@@ -22,31 +24,46 @@ path_to_zip = tf.keras.utils.get_file(
 path_to_zip = pathlib.Path(path_to_zip)
 
 PATH = path_to_zip.parent / dataset_name
+PATH = 'Data/tmp_data_magmap/'
+print(os.listdir(PATH))
 
-print(list(PATH.parent.iterdir()))
-
-sample_image = tf.io.read_file(str(PATH / 'train/1.jpg'))
-sample_image = tf.io.decode_jpeg(sample_image)
-print(sample_image.shape)
-
+# sample_image = tf.io.read_file(str(PATH / 'train/'))
+# sample_image = tf.io.decode_jpeg(sample_image)
+# print(sample_image.shape)
+sample_image = np.squeeze(np.load(PATH + 'train/magmap_2235_0.npy')[0, :, :, :])
 plt.figure()
 plt.imshow(sample_image)
 plt.show()
 
 
-def load(image_file):
+def read_npy_file(item):
+    data = np.load(item)
+    return data
+
+
+def load(file_name):
+    print(file_name)
     # Read and decode an image file to a uint8 tensor
-    image = tf.io.read_file(image_file)
-    image = tf.io.decode_jpeg(image)
+    # image = tf.io.read_file(image_file)
+    # image = tf.io.decode_jpeg(image)
+    # magmap_pair = tf.numpy_function(read_npy_file,file_name)
+    if type(file_name) != str:
+        file_name = file_name.numpy
+    magmap_pair = np.load(file_name)
+    print(magmap_pair)
+    input_image = np.squeeze(magmap_pair[0, :, :, :])
+    real_image = np.squeeze(magmap_pair[1, :, :, :])
 
     # Split each image tensor into two tensors:
     # - one with a real building facade image
     # - one with an architecture label image
-    w = tf.shape(image)[1]
-    w = w // 2
-    input_image = image[:, w:, :]
-    real_image = image[:, :w, :]
-
+    # w = tf.shape(image)[1]
+    # w = w // 2
+    # input_image = image[:, w:, :]
+    # real_image = image[:, :w, :]
+    # print(input_image)
+    # input_image = vector_magmap(2246,0)
+    # real_image = vector_magmap(2246,1)
     # Convert both images to float32 tensors
     input_image = tf.cast(input_image, tf.float32)
     real_image = tf.cast(real_image, tf.float32)
@@ -54,20 +71,20 @@ def load(image_file):
     return input_image, real_image
 
 
-inp, re = load(str(PATH / 'train/100.jpg'))
+inp, re = load(PATH + 'train/magmap_2235_0.npy')
 # Casting to int for matplotlib to display the images
 plt.figure()
-plt.imshow(inp / 255.0)
+plt.imshow(inp)
 plt.figure()
-plt.imshow(re / 255.0)
+plt.imshow(re)
 plt.show()
 
 # The facade training set consist of 400 images
-BUFFER_SIZE = 400
+BUFFER_SIZE = 4
 # The batch size of 1 produced better results for the U-Net in the original pix2pix experiment
 BATCH_SIZE = 1
 # Each image is 256x256 in size
-IMG_WIDTH = 256
+IMG_WIDTH = 512
 IMG_HEIGHT = 256
 
 
@@ -90,8 +107,9 @@ def random_crop(input_image, real_image):
 
 # Normalizing the images to [-1, 1]
 def normalize(input_image, real_image):
-    input_image = (input_image / 127.5) - 1
-    real_image = (real_image / 127.5) - 1
+    norm_max = tf.reduce_max([abs(tf.reduce_max(input_image)), abs(tf.reduce_min(input_image))])
+    input_image = (input_image / norm_max)
+    real_image = (real_image / norm_max)
 
     return input_image, real_image
 
@@ -99,7 +117,7 @@ def normalize(input_image, real_image):
 @tf.function()
 def random_jitter(input_image, real_image):
     # Resizing to 286x286
-    input_image, real_image = resize(input_image, real_image, 286, 286)
+    input_image, real_image = resize(input_image, real_image, 280, 560)
 
     # Random cropping back to 256x256
     input_image, real_image = random_crop(input_image, real_image)
@@ -112,13 +130,13 @@ def random_jitter(input_image, real_image):
     return input_image, real_image
 
 
-plt.figure(figsize=(6, 6))
-for i in range(4):
-    rj_inp, rj_re = random_jitter(inp, re)
-    plt.subplot(2, 2, i + 1)
-    plt.imshow(rj_inp / 255.0)
-    plt.axis('off')
-plt.show()
+# plt.figure(figsize=(6, 6))
+# for i in range(4):
+#     rj_inp, rj_re = random_jitter(inp, re)
+#     plt.subplot(2, 2, i + 1)
+#     plt.imshow(rj_inp)
+#     plt.axis('off')
+# plt.show()
 
 
 def load_image_train(image_file):
@@ -138,16 +156,24 @@ def load_image_test(image_file):
     return input_image, real_image
 
 
-train_dataset = tf.data.Dataset.list_files(str(PATH / 'train/*.jpg'))
+PATH = 'Data/tmp_data_magmap/'
+train_file_list = os.listdir('Data/tmp_data_magmap/train/')
+train_file_list = [PATH + 'train/' + fn for fn in train_file_list]
+print(train_file_list)
+train_dataset = tf.data.Dataset.list_files(PATH + 'train/*.npy')
+# train_dataset = train_file_list
+# train_dataset = tf.data.Dataset.list_files(str(PATH / 'train/*.jpg'))
+print(train_dataset)
 train_dataset = train_dataset.map(load_image_train,
                                   num_parallel_calls=tf.data.AUTOTUNE)
+print(train_dataset)
 train_dataset = train_dataset.shuffle(BUFFER_SIZE)
 train_dataset = train_dataset.batch(BATCH_SIZE)
 
 try:
-    test_dataset = tf.data.Dataset.list_files(str(PATH / 'test/*.jpg'))
+    test_dataset = tf.data.Dataset.list_files(PATH + 'test/*.npy')
 except tf.errors.InvalidArgumentError:
-    test_dataset = tf.data.Dataset.list_files(str(PATH / 'val/*.jpg'))
+    test_dataset = tf.data.Dataset.list_files(PATH + 'val/*.npy')
 test_dataset = test_dataset.map(load_image_test)
 test_dataset = test_dataset.batch(BATCH_SIZE)
 
@@ -201,12 +227,12 @@ print(up_result.shape)
 
 
 def Generator():
-    inputs = tf.keras.layers.Input(shape=[256, 256, 3])
+    inputs = tf.keras.layers.Input(shape=[512, 256, 3])
 
     down_stack = [
-        downsample(64, 4, apply_batchnorm=False),  # (batch_size, 128, 128, 64)
-        downsample(128, 4),  # (batch_size, 64, 64, 128)
-        downsample(256, 4),  # (batch_size, 32, 32, 256)
+        downsample(64, 4, apply_batchnorm=False),  # (batch_size, 128, 128, 64) (180,90)
+        downsample(128, 4),  # (batch_size, 64, 64, 128) (90,45)
+        downsample(256, 4),  # (batch_size, 32, 32, 256) (45,23)
         downsample(512, 4),  # (batch_size, 16, 16, 512)
         downsample(512, 4),  # (batch_size, 8, 8, 512)
         downsample(512, 4),  # (batch_size, 4, 4, 512)
@@ -236,6 +262,7 @@ def Generator():
     skips = []
     for down in down_stack:
         x = down(x)
+        print(x)
         skips.append(x)
 
     skips = reversed(skips[:-1])
@@ -243,6 +270,7 @@ def Generator():
     # Upsampling and establishing the skip connections
     for up, skip in zip(up_stack, skips):
         x = up(x)
+        print(x)
         x = tf.keras.layers.Concatenate()([x, skip])
 
     x = last(x)
@@ -251,7 +279,7 @@ def Generator():
 
 
 generator = Generator()
-tf.keras.utils.plot_model(generator, show_shapes=True, dpi=64)
+tf.keras.utils.plot_model(generator, show_shapes=True, dpi=128)
 
 gen_output = generator(inp[tf.newaxis, ...], training=False)
 plt.imshow(gen_output[0, ...])
@@ -275,8 +303,8 @@ def generator_loss(disc_generated_output, gen_output, target):
 def Discriminator():
     initializer = tf.random_normal_initializer(0., 0.02)
 
-    inp = tf.keras.layers.Input(shape=[256, 256, 3], name='input_image')
-    tar = tf.keras.layers.Input(shape=[256, 256, 3], name='target_image')
+    inp = tf.keras.layers.Input(shape=[512, 256, 3], name='input_image')
+    tar = tf.keras.layers.Input(shape=[512, 256, 3], name='target_image')
 
     x = tf.keras.layers.concatenate([inp, tar])  # (batch_size, 256, 256, channels*2)
 
@@ -302,7 +330,7 @@ def Discriminator():
 
 
 discriminator = Discriminator()
-tf.keras.utils.plot_model(discriminator, show_shapes=True, dpi=64)
+tf.keras.utils.plot_model(discriminator, show_shapes=True, dpi=128)
 
 disc_out = discriminator([inp[tf.newaxis, ...], gen_output], training=False)
 plt.imshow(disc_out[0, ..., -1], vmin=-20, vmax=20, cmap='RdBu_r')
