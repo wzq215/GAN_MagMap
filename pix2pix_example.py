@@ -12,7 +12,7 @@ import numpy as np
 PATH = 'Data/tmp_data_magmap/'
 print(os.listdir(PATH))
 
-sample_image = np.squeeze(np.load(PATH + 'train/magmap_2235_0.npy')[0, :, :, :])
+sample_image = np.squeeze(np.load(PATH + 'train/magmap_1800_1_45.npy')[0, :, :, :])
 
 plt.figure()
 plt.imshow(sample_image / 100 + .5)
@@ -32,8 +32,17 @@ def load(file_name):
             f.write(str(file_name))
     magmap_pair = np.load(file_name, allow_pickle=True)
     # print('magmap_pair: ', magmap_pair)
-    input_image = np.squeeze(magmap_pair[0, :, :, :]) / 100 + 0.5
-    real_image = np.squeeze(magmap_pair[1, :, :, :]) / 100 + 0.5
+    input_image = np.squeeze(magmap_pair[0, :, :, :])  # / 100 + 0.5
+    real_image = np.squeeze(magmap_pair[1, :, :, :])  # / 0.4 + 0.5
+
+    input_image[:, :, 0] = input_image[:, :, 0] / 100. + .5
+    input_image[:, :, 1] = input_image[:, :, 1] / 50. + .5
+    input_image[:, :, 2] = input_image[:, :, 2] / 50. + .5
+
+    real_image[:, :, 0] = real_image[:, :, 0] / .4 + .5
+    real_image[:, :, 1] = real_image[:, :, 1] / .2 + .5
+    real_image[:, :, 2] = real_image[:, :, 2] / .2 + .5
+
     input_image = tf.cast(input_image, tf.float32)
     real_image = tf.cast(real_image, tf.float32)
     # print('input_image: ', input_image)
@@ -43,9 +52,9 @@ def load(file_name):
 
 
 print('--------visualize sample data---------')
-train_dataset = tf.data.Dataset.list_files(PATH + 'train/magmap_2235_0.npy')
-tf.data.Dataset.list_files(PATH + 'train/magmap_2235_0.npy')
-inp, re = load(PATH + 'train/magmap_2235_0.npy')
+train_dataset = tf.data.Dataset.list_files(PATH + 'train/magmap_1800_1_45.npy')
+tf.data.Dataset.list_files(PATH + 'train/magmap_1800_1_45.npy')
+inp, re = load(PATH + 'train/magmap_1800_1_45.npy')
 # Casting to int for matplotlib to display the images
 plt.figure()
 plt.imshow(inp)
@@ -59,15 +68,15 @@ BUFFER_SIZE = 4
 # The batch size of 1 produced better results for the U-Net in the original pix2pix experiment
 BATCH_SIZE = 1
 # Each image is 256x256 in size
-IMG_WIDTH = 512
-IMG_HEIGHT = 256
+IMG_WIDTH = 256
+IMG_HEIGHT = 128
 
 
 def resize(input_image, real_image, height, width):
     # print('---------resize start--------')
     # print(input_image)
-    input_image.set_shape([256, 512, 3])
-    real_image.set_shape([256, 512, 3])
+    input_image.set_shape([128, 256, 3])
+    real_image.set_shape([128, 256, 3])
     # print(input_image)
     input_image = tf.image.resize(input_image, [height, width],
                                   method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -99,7 +108,7 @@ def normalize(input_image, real_image):
 @tf.function()
 def random_jitter(input_image, real_image):
     # Resizing to 286x286
-    input_image, real_image = resize(input_image, real_image, 280, 560)
+    input_image, real_image = resize(input_image, real_image, 140, 280)
 
     # Random cropping back to 256x256
     input_image, real_image = random_crop(input_image, real_image)
@@ -211,7 +220,7 @@ print(up_result.shape)
 
 
 def Generator():
-    inputs = tf.keras.layers.Input(shape=[256, 512, 3])
+    inputs = tf.keras.layers.Input(shape=[128, 256, 3])
 
     down_stack = [
         downsample(64, 4, apply_batchnorm=False),  # (batch_size, 128, 128, 64) (180,90)
@@ -221,10 +230,10 @@ def Generator():
         downsample(512, 4),  # (batch_size, 8, 8, 512)
         downsample(512, 4),  # (batch_size, 4, 4, 512)
         downsample(512, 4),  # (batch_size, 2, 2, 512)
-        downsample(512, 4),  # (batch_size, 1, 1, 512)
+        # downsample(512, 4),  # (batch_size, 1, 1, 512)
     ]
     up_stack = [
-        upsample(512, 4, apply_dropout=True),  # (batch_size, 2, 2, 1024)
+        # upsample(512, 4, apply_dropout=True),  # (batch_size, 2, 2, 1024)
         upsample(512, 4, apply_dropout=True),  # (batch_size, 4, 4, 1024)
         upsample(512, 4, apply_dropout=True),  # (batch_size, 8, 8, 1024)
         upsample(512, 4),  # (batch_size, 16, 16, 1024)
@@ -288,8 +297,8 @@ def generator_loss(disc_generated_output, gen_output, target):
 def Discriminator():
     initializer = tf.random_normal_initializer(0., 0.02)
 
-    inp = tf.keras.layers.Input(shape=[256, 512, 3], name='input_image')
-    tar = tf.keras.layers.Input(shape=[256, 512, 3], name='target_image')
+    inp = tf.keras.layers.Input(shape=[128, 256, 3], name='input_image')
+    tar = tf.keras.layers.Input(shape=[128, 256, 3], name='target_image')
 
     x = tf.keras.layers.concatenate([inp, tar])  # (batch_size, 256, 256, channels*2)
 
@@ -359,7 +368,8 @@ def generate_images(model, test_input, tar):
         # Getting the pixel values in the [0, 1] range to plot.
         plt.imshow(display_list[i] * 0.5 + 0.5)
         plt.axis('off')
-    plt.show()
+    plt.savefig(datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '.png')
+    plt.close()
 
 
 for example_input, example_target in test_dataset.take(1):
@@ -413,7 +423,7 @@ def fit(train_ds, test_ds, steps):
             start = time.time()
 
             generate_images(generator, example_input, example_target)
-            print(f"Step: {step // 100}k")
+            print(f"Step: {step // 100}00")
 
         train_step(input_image, target, step)
 
@@ -429,6 +439,6 @@ def fit(train_ds, test_ds, steps):
 # %load_ext tensorboard
 # %tensorboard --logdir {log_dir}
 
-fit(train_dataset, test_dataset, steps=500)
-for example_input, example_target in test_dataset.take(1):
-    generate_images(generator, example_input, example_target)
+fit(train_dataset, test_dataset, steps=5000)
+# for example_input, example_target in test_dataset.take(1):
+#     generate_images(generator, example_input, example_target)

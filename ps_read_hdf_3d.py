@@ -47,13 +47,16 @@ import os, sys
 from tqdm import tqdm
 
 
-def ps_read_hdf_3d(crid, region, param, periodicDim=[]):
+def ps_read_hdf_3d(crid, region, param, periodicDim=[], auto=False):
     path = 'Data/cr' + str(crid) + '/' + region + '/'
     filename = param + '.hdf'
     # print(path + filename)
     # print(os.path.exists(path + filename))
     if not os.path.exists(path + filename):
-        ps_load_hdf(crid, region, param)
+        pp = ps_load_hdf(crid, region, param, auto=auto)
+        if bool(pp) is False:
+            print('Nothing Found in this CR!')
+            return 0
 
     sdId = SD(path + filename)
     sdkeys = sdId.datasets().keys()
@@ -101,7 +104,7 @@ def ps_read_hdf_3d(crid, region, param, periodicDim=[]):
     return dict
 
 
-def ps_load_hdf(crid, region, param):
+def ps_load_hdf(crid, region, param, auto=False):
     # https://www.predsci.com/data/runs/cr2246-high/hmi_mast_mas_std_0201/corona/
     url = 'https://www.predsci.com/data/runs/'
     url += 'cr' + str(crid) + '-'
@@ -118,15 +121,22 @@ def ps_load_hdf(crid, region, param):
         url += 'medium/'
         if str(requests.get(url, verify=False)) == '<Response [404]>':
             print('Nothing Found!')
-            return
+            return 0
 
-    r_links = requests.get(url,verify=False)
-    res_url =  r"(?<=href=\").+?(?=\")|(?<=href=\').+?(?=\')"
-    links = re.findall(res_url,str(r_links.content),re.I|re.S|re.M)
+    r_links = requests.get(url, verify=False)
+    res_url = r"(?<=href=\").+?(?=\")|(?<=href=\').+?(?=\')"
+    links = re.findall(res_url, str(r_links.content), re.I | re.S | re.M)
     l = [s for s in links if 'mas' in s]
     for i in range(len(l)):
-        print(i,l[i])
-    s=int(input('choose one file: (e.g. 0)'))
+        print(i, l[i])
+    if auto:
+        s = 0
+        print('choose 0')
+        with open('load_PSI_DATA.txt', 'a') as f:
+            f.write(str(crid) + ' ')
+            f.write(str(l[0]) + '\n')
+    else:
+        s = int(input('choose one file: (e.g. 0)'))
 
     url += l[s] + region + '/'
     path += '/' + region + '/'
@@ -144,6 +154,7 @@ def ps_load_hdf(crid, region, param):
             size = f.write(data)
             bar.update(size)
         f.close
+    return 1
 
 
 if __name__ == '__main__':
