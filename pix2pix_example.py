@@ -355,9 +355,9 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator=discriminator)
 
 
-def generate_images(model, test_input, tar):
+def generate_images(model, test_input, tar, step=0):
     prediction = model(test_input, training=True)
-    plt.figure(figsize=(15, 15))
+    plt.figure(figsize=(15, 5))
 
     display_list = [test_input[0], tar[0], prediction[0]]
     title = ['Input Image', 'Ground Truth', 'Predicted Image']
@@ -368,7 +368,7 @@ def generate_images(model, test_input, tar):
         # Getting the pixel values in the [0, 1] range to plot.
         plt.imshow(display_list[i] * 0.5 + 0.5)
         plt.axis('off')
-    plt.savefig(datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '.png')
+    plt.savefig('export/' + datetime.datetime.now().strftime("%Y%m%d") + '/step_' + str(step) + '.png')
     plt.close()
 
 
@@ -422,7 +422,7 @@ def fit(train_ds, test_ds, steps):
 
             start = time.time()
 
-            generate_images(generator, example_input, example_target)
+            generate_images(generator, example_input, example_target, step=step.numpy())
             print(f"Step: {step // 100}00")
 
         train_step(input_image, target, step)
@@ -439,6 +439,7 @@ def fit(train_ds, test_ds, steps):
 # %load_ext tensorboard
 # %tensorboard --logdir {log_dir}
 
-fit(train_dataset, test_dataset, steps=5000)
+
+fit(train_dataset, test_dataset, steps=1000)
 # for example_input, example_target in test_dataset.take(1):
 #     generate_images(generator, example_input, example_target)

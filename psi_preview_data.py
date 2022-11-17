@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-PATH = 'Data/tmp_data_magmap/train/'
+PATH = 'Data/tmp_data_magmap/test/'
 count = 0
 crids = np.arange(1625, 2050)
 br_min_1s = crids * 0.

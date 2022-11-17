@@ -37,6 +37,7 @@ Output:
 """
 import re
 
+from matplotlib import pyplot as plt
 from pyhdf.HDF import *
 from pyhdf.SD import *
 import numpy as np
@@ -158,5 +159,15 @@ def ps_load_hdf(crid, region, param, auto=False):
 
 
 if __name__ == '__main__':
-    dict = ps_read_hdf_3d(2246, 'corona', 'bp002')
+    data_vr = ps_read_hdf_3d(2178, 'corona', 'vr002')
+    r_vr = np.array(data_vr['scales1'])  # 255 in Rs, distance from sun
+    t_vr = np.array(data_vr['scales2'])  # 150 in rad, latitude
+    p_vr = np.array(data_vr['scales3'])  # 256 in rad, Carrington longitude
+    vr = np.array(data_vr['datas']) * 481.3711
+
+    plt.pcolor(np.rad2deg(p_vr), t_vr, vr[:, :, 140].T)
+    plt.colorbar()
+    # plt.clim(0,1e-3)
+    plt.set_cmap('jet_r')
+    plt.show()
     # print(dict['scales1'])
